@@ -8,7 +8,7 @@ import os
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
 # УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫЕ ДАННЫЕ
-BOT_TOKEN = "8522157971:AAEbql6voTI5zGA7zbOJxGZXkU_al51aXPo"
+BOT_TOKEN = "8522157971:AAFDGk7ca05Ji4rOb83mRbbmlsvdpou3rwM"
 ADMIN_CHAT_ID = "866572746"
 # ---------------------------------
 
@@ -97,3 +97,4 @@ if __name__ == "__main__":
     bot_thread.start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
