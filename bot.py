@@ -25,7 +25,7 @@ def index():
     return "I am alive!"
 # ----------------------------------
 
-# --- ОСНОВНАЯ ЛОГИКА БОТА (БЕЗ ИЗМЕНЕНИЙ) ---
+# --- ОСНОВНАЯ ЛОГИКА БОТА ---
 shifts = {
     "08:00-09:30": None, "09:30-11:00": None, "11:00-12:30": None,
     "12:30-14:00": None, "14:00-15:30": None, "15:30-17:00": None,
@@ -68,7 +68,8 @@ def take_shift_callback(update: telegram.Update, context: CallbackContext):
     else:
         query.answer("😔 Эта смена уже занята. Пожалуйста, выберите другую.", show_alert=True)
 
-def reset_shifts_job(context: CallbackContext):
+# ИЗМЕНЕНИЕ №1: Убрали 'context: CallbackContext' из аргументов
+def reset_shifts_job():
     global shifts
     for shift_time in shifts:
         shifts[shift_time] = None
@@ -81,20 +82,20 @@ def main_bot():
     dispatcher.add_handler(CommandHandler("shifts", show_shifts))
     dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
     scheduler = BackgroundScheduler(timezone="Europe/Moscow")
-    scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0, args=[updater.job_queue.context])
+    
+    # ИЗМЕНЕНИЕ №2: Убрали 'args' из вызова
+    scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
+    
     scheduler.start()
     updater.start_polling()
     logger.info("Бот запущен...")
     updater.idle()
 # -------------------------------------------------------------
 
-# --- ИЗМЕНЕННЫЙ БЛОК ЗАПУСКА ---
 if __name__ == "__main__":
-    # Запускаем бота в фоновом потоке, чтобы он не блокировал веб-сервер
     bot_thread = Thread(target=main_bot)
     bot_thread.daemon = True
     bot_thread.start()
-
-    # Запускаем веб-сервер в основном потоке (этого ожидает Render)
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
