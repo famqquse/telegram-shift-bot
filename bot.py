@@ -7,7 +7,7 @@ from threading import Thread
 import os
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
-# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫE ДАННЫЕ
+# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫЕ ДАННЫЕ
 BOT_TOKEN = "8522157971:AAEbql6voTI5zGA7zbOJxGZXkU_al51aXPo"
 ADMIN_CHAT_ID = "866572746"
 # ---------------------------------
@@ -75,7 +75,6 @@ def reset_shifts_job():
     logger.info("Все смены были сброшены.")
 
 def main_bot():
-    # НОВОЕ: Оборачиваем весь запуск бота в "черный ящик" try...except
     try:
         updater = Updater(BOT_TOKEN, use_context=True)
         dispatcher = updater.dispatcher
@@ -87,9 +86,8 @@ def main_bot():
         scheduler.start()
         updater.start_polling()
         logger.info("Бот запущен...")
-        updater.idle()
+        # updater.idle() # <-- **ЭТА СТРОКА УДАЛЕНА. В НЕЙ БЫЛА ПРИЧИНА СБОЯ.**
     except Exception as e:
-        # НОВОЕ: Если что-то в боте сломается, мы запишем критическую ошибку в лог
         logger.critical(f"Критическая ошибка в потоке бота: {e}", exc_info=True)
 # -------------------------------------------------------------
 
@@ -99,3 +97,4 @@ if __name__ == "__main__":
     bot_thread.start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
