@@ -86,7 +86,7 @@ def main_bot():
         scheduler.start()
         updater.start_polling()
         logger.info("Бот запущен...")
-        # updater.idle() # <-- **ЭТА СТРОКА УДАЛЕНА. В НЕЙ БЫЛА ПРИЧИНА СБОЯ.**
+        # Строка updater.idle() удалена, так как она вызывала сбой.
     except Exception as e:
         logger.critical(f"Критическая ошибка в потоке бота: {e}", exc_info=True)
 # -------------------------------------------------------------
@@ -97,4 +97,3 @@ if __name__ == "__main__":
     bot_thread.start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
