@@ -7,7 +7,7 @@ from threading import Thread
 import os
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
-# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫЕ ДАННЫЕ
+# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫE ДАННЫЕ
 BOT_TOKEN = "8522157971:AAEbql6voTI5zGA7zbOJxGZXkU_al51aXPo"
 ADMIN_CHAT_ID = "866572746"
 # ---------------------------------
@@ -68,7 +68,6 @@ def take_shift_callback(update: telegram.Update, context: CallbackContext):
     else:
         query.answer("😔 Эта смена уже занята. Пожалуйста, выберите другую.", show_alert=True)
 
-# ИЗМЕНЕНИЕ №1: Убрали 'context: CallbackContext' из аргументов
 def reset_shifts_job():
     global shifts
     for shift_time in shifts:
@@ -76,20 +75,22 @@ def reset_shifts_job():
     logger.info("Все смены были сброшены.")
 
 def main_bot():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("shifts", show_shifts))
-    dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
-    scheduler = BackgroundScheduler(timezone="Europe/Moscow")
-    
-    # ИЗМЕНЕНИЕ №2: Убрали 'args' из вызова
-    scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
-    
-    scheduler.start()
-    updater.start_polling()
-    logger.info("Бот запущен...")
-    updater.idle()
+    # НОВОЕ: Оборачиваем весь запуск бота в "черный ящик" try...except
+    try:
+        updater = Updater(BOT_TOKEN, use_context=True)
+        dispatcher = updater.dispatcher
+        dispatcher.add_handler(CommandHandler("start", start))
+        dispatcher.add_handler(CommandHandler("shifts", show_shifts))
+        dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
+        scheduler = BackgroundScheduler(timezone="Europe/Moscow")
+        scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
+        scheduler.start()
+        updater.start_polling()
+        logger.info("Бот запущен...")
+        updater.idle()
+    except Exception as e:
+        # НОВОЕ: Если что-то в боте сломается, мы запишем критическую ошибку в лог
+        logger.critical(f"Критическая ошибка в потоке бота: {e}", exc_info=True)
 # -------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -98,4 +99,3 @@ if __name__ == "__main__":
     bot_thread.start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
