@@ -4,37 +4,28 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 from flask import Flask
 from threading import Thread
-import os # Импортируем os
+import os
 
-# --- НАСТРОЙКИ ---
-# Вставьте сюда токен вашего бота (полученный от @BotFather)
+# --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
+# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫЕ ДАННЫЕ
 BOT_TOKEN = "8522157971:AAEbql6voTI5zGA7zbOJxGZXkU_al51aXPo"
-# Вставьте сюда ваш ID в Telegram, чтобы бот присылал вам уведомления.
-# Чтобы узнать свой ID, можно написать боту @userinfobot
 ADMIN_CHAT_ID = "866572746"
-# -----------------
+# ---------------------------------
 
-# Настройка логирования для отладки
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# --- ВЕБ-ЧАСТЬ ДЛЯ RENDER.COM (ЧТОБЫ БОТ НЕ ЗАСЫПАЛ) ---
+# --- ВЕБ-ЧАСТЬ ДЛЯ RENDER.COM ---
 app = Flask(__name__)
 
 @app.route('/')
 def index():
     return "I am alive!"
+# ----------------------------------
 
-def run_flask():
-    # Render предоставляет порт в переменной окружения PORT
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-# --------------------------------------------------------
-
-
-# --- ОСНОВНАЯ ЛОГИКА ВАШЕГО БОТА (ничего не изменилось) ---
+# --- ОСНОВНАЯ ЛОГИКА БОТА (БЕЗ ИЗМЕНЕНИЙ) ---
 shifts = {
     "08:00-09:30": None, "09:30-11:00": None, "11:00-12:30": None,
     "12:30-14:00": None, "14:00-15:30": None, "15:30-17:00": None,
@@ -84,7 +75,7 @@ def reset_shifts_job(context: CallbackContext):
     logger.info("Все смены были сброшены.")
 
 def main_bot():
-    updater = Updater(BOT_TOKEN)
+    updater = Updater(BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("shifts", show_shifts))
@@ -97,11 +88,13 @@ def main_bot():
     updater.idle()
 # -------------------------------------------------------------
 
-if __name__ == '__main__':
-    # Запускаем веб-сервер в основном потоке
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
-    
-    # Запускаем бота в фоновом потоке
-    main_bot()
+# --- ИЗМЕНЕННЫЙ БЛОК ЗАПУСКА ---
+if __name__ == "__main__":
+    # Запускаем бота в фоновом потоке, чтобы он не блокировал веб-сервер
+    bot_thread = Thread(target=main_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
 
+    # Запускаем веб-сервер в основном потоке (этого ожидает Render)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
