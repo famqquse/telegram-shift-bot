@@ -5,6 +5,7 @@ import logging
 from flask import Flask
 from threading import Thread
 import os
+import datetime
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
 # УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОЙ АКТУАЛЬНЫЙ ТОКЕН
@@ -17,60 +18,116 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- ВЕБ-ЧАСТЬ ДЛЯ FLY.IO ---
 app = Flask(__name__)
-
 @app.route('/')
 def index():
     return "I am alive!"
 
-shifts = {
-    "08:00-09:30": None, "09:30-11:00": None, "11:00-12:30": None,
-    "12:30-14:00": None, "14:00-15:30": None, "15:30-17:00": None,
-    "17:00-18:30": None, "18:30-20:00": None, "20:00-21:30": None,
-    "21:30-23:00": None, "23:00-08:00": None,
-}
+# --- СТРУКТУРА ДАННЫХ ДЛЯ СМЕН ---
+base_shift_times = [
+    "08:00-09:30", "09:30-11:00", "11:00-12:30", "12:30-14:00",
+    "14:00-15:30", "15:30-17:00", "17:00-18:30", "18:30-20:00",
+    "20:00-21:30", "21:30-23:00", "23:00-08:00"
+]
 
-# ... (остальной код бота без изменений) ...
+shifts = []
+slot_id_counter = 0
+for _ in range(2):
+    for time_slot in base_shift_times:
+        shifts.append({
+            "slot_id": slot_id_counter,
+            "time": time_slot,
+            "user_info": None
+        })
+        slot_id_counter += 1
+
+# --- ОСНОВНАЯ ЛОГИКА БОТА ---
+
 def create_shifts_keyboard():
     keyboard = []
-    for shift_time, user_info in shifts.items():
-        text = f"✅ {shift_time} (Свободна)"
-        if user_info:
-            text = f"❌ {shift_time} (Занята)"
-        button = telegram.InlineKeyboardButton(text, callback_data=shift_time)
+    sorted_shifts = sorted(shifts, key=lambda x: (x['time'].split('-')[0], x['slot_id']))
+    for slot in sorted_shifts:
+        text = f"✅ {slot['time']} (Свободна)"
+        if slot['user_info']:
+            text = f"❌ {slot['time']} (Занята: {slot['user_info']['first_name']})"
+        button = telegram.InlineKeyboardButton(text, callback_data=str(slot['slot_id']))
         keyboard.append([button])
     return telegram.InlineKeyboardMarkup(keyboard)
 
 def start(update: telegram.Update, context: CallbackContext):
     user_name = update.effective_user.first_name
-    update.message.reply_text(f"👋 Привет, {user_name}!\n\nЯ бот для бронирования смен. Чтобы посмотреть доступные смены, используй команду /shifts.")
+    update.message.reply_text(f"👋 Привет, {user_name}!\n\nЯ бот для бронирования смен. Чтобы посмотреть доступные смены, используй команду /shifts.\n\nАдминистратор может получить отчет по команде /grafik.")
 
 def show_shifts(update: telegram.Update, context: CallbackContext):
+    # ИЗМЕНЕНИЕ: Получаем дату в нужном формате
+    today_date_str = datetime.datetime.now().strftime("%d.%m.%Y")
     keyboard = create_shifts_keyboard()
-    update.message.reply_text("🗓️ **Доступные смены на сегодня:**\n\nНажмите на свободную смену, чтобы занять ее.", reply_markup=keyboard, parse_mode='Markdown')
+    update.message.reply_text(f"🗓️ **Доступные смены на {today_date_str}:**\n\nНажмите на свободную смену, чтобы занять ее.", reply_markup=keyboard, parse_mode='Markdown')
 
 def take_shift_callback(update: telegram.Update, context: CallbackContext):
     query = update.callback_query
-    query.answer()
-    shift_time = query.data
+    target_slot_id = int(query.data)
+    
+    target_slot = next((slot for slot in shifts if slot["slot_id"] == target_slot_id), None)
+    
+    if not target_slot:
+        query.answer("Произошла ошибка, слот не найден. Попробуйте обновить список: /shifts", show_alert=True)
+        return
+
     user = query.from_user
-    if shifts.get(shift_time) is None:
-        shifts[shift_time] = {'id': user.id, 'first_name': user.first_name, 'username': user.username or "не указан"}
-        query.edit_message_text(f"✅ Отлично! Вы заняли смену: **{shift_time}**.\n\nСписок смен обновлен.", parse_mode='Markdown')
-        context.bot.edit_message_reply_markup(chat_id=query.message.chat_id, message_id=query.message.message_id, reply_markup=create_shifts_keyboard())
-        admin_message = f"🔔 **Новая бронь!**\n\n👤 **Пользователь:** {user.first_name} (@{user.username})\n⏰ **Смена:** {shift_time}"
+    if target_slot['user_info'] is None:
+        target_slot['user_info'] = {'id': user.id, 'first_name': user.first_name, 'username': user.username or "не указан"}
+        
+        query.answer(f"Отлично! Вы заняли смену: {target_slot['time']}.")
+        
+        admin_message = f"🔔 **Новая бронь!**\n\n👤 **Пользователь:** {user.first_name} (@{user.username})\n⏰ **Смена:** {target_slot['time']}"
         try:
             context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_message, parse_mode='Markdown')
         except Exception as e:
             logger.error(f"Не удалось отправить сообщение админу: {e}")
+
+        # ИЗМЕНЕНИЕ: Обновляем клавиатуру с датой
+        today_date_str = datetime.datetime.now().strftime("%d.%m.%Y")
+        context.bot.edit_message_text(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            text=f"🗓️ **Доступные смены на {today_date_str}:**\n\nСписок обновлен.",
+            reply_markup=create_shifts_keyboard(),
+            parse_mode='Markdown'
+        )
     else:
         query.answer("😔 Эта смена уже занята. Пожалуйста, выберите другую.", show_alert=True)
 
 def reset_shifts_job():
-    global shifts
-    for shift_time in shifts:
-        shifts[shift_time] = None
-    logger.info("Все смены были сброшены.")
+    for slot in shifts:
+        slot['user_info'] = None
+    logger.info("Все смены были сброшены на новый день.")
+
+def send_grafik(update: telegram.Update, context: CallbackContext):
+    user_id = str(update.effective_user.id)
+    if user_id != ADMIN_CHAT_ID:
+        update.message.reply_text("Эта команда доступна только администратору.")
+        return
+
+    # ИЗМЕНЕНИЕ: Получаем дату для отчета
+    today_date_str = datetime.datetime.now().strftime("%d.%m.%Y")
+    
+    booked_shifts = [slot for slot in shifts if slot['user_info']]
+    
+    if not booked_shifts:
+        report_message = f"📋 **Отчет на {today_date_str}**\n\nНа сегодня смен еще не забронировано."
+    else:
+        report_message = f"📋 **Отчет на {today_date_str}**\n\nЗабронированные смены:\n"
+        sorted_booked = sorted(booked_shifts, key=lambda x: (x['time'].split('-')[0], x['slot_id']))
+        for slot in sorted_booked:
+            user_info = slot['user_info']
+            report_message += f"\n• **{slot['time']}**: {user_info['first_name']} (@{user_info['username']})"
+            
+    try:
+        context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=report_message, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Не удалось отправить отчет админу: {e}")
 
 def main_bot():
     try:
@@ -78,6 +135,7 @@ def main_bot():
         dispatcher = updater.dispatcher
         dispatcher.add_handler(CommandHandler("start", start))
         dispatcher.add_handler(CommandHandler("shifts", show_shifts))
+        dispatcher.add_handler(CommandHandler("grafik", send_grafik))
         dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
         scheduler = BackgroundScheduler(timezone="Europe/Moscow")
         scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
