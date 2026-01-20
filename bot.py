@@ -2,12 +2,10 @@ import telegram
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 from apscheduler.schedulers.background import BackgroundScheduler
 import logging
-from flask import Flask
-from threading import Thread
 import os
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
-# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОИ РЕАЛЬНЫЕ ДАННЫЕ
+# УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОЙ АКТУАЛЬНЫЙ ТОКЕН
 BOT_TOKEN = "8522157971:AAFDGk7ca05Ji4rOb83mRbbmlsvdpou3rwM"
 ADMIN_CHAT_ID = "866572746"
 # ---------------------------------
@@ -17,15 +15,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- ВЕБ-ЧАСТЬ ДЛЯ RENDER.COM ---
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return "I am alive!"
-# ----------------------------------
-
-# --- ОСНОВНАЯ ЛОГИКА БОТА ---
 shifts = {
     "08:00-09:30": None, "09:30-11:00": None, "11:00-12:30": None,
     "12:30-14:00": None, "14:00-15:30": None, "15:30-17:00": None,
@@ -74,28 +63,18 @@ def reset_shifts_job():
         shifts[shift_time] = None
     logger.info("Все смены были сброшены.")
 
-def main_bot():
-    try:
-        updater = Updater(BOT_TOKEN, use_context=True)
-        dispatcher = updater.dispatcher
-        dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("shifts", show_shifts))
-        dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
-        scheduler = BackgroundScheduler(timezone="Europe/Moscow")
-        scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
-        scheduler.start()
-        updater.start_polling()
-        logger.info("Бот запущен...")
-        # Строка updater.idle() удалена, так как она вызывала сбой.
-    except Exception as e:
-        logger.critical(f"Критическая ошибка в потоке бота: {e}", exc_info=True)
-# -------------------------------------------------------------
+def main():
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("shifts", show_shifts))
+    dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
+    scheduler = BackgroundScheduler(timezone="Europe/Moscow")
+    scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
+    scheduler.start()
+    updater.start_polling()
+    logger.info("Бот запущен...")
+    updater.idle()
 
-if __name__ == "__main__":
-    bot_thread = Thread(target=main_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-
+if __name__ == '__main__':
+    main()
