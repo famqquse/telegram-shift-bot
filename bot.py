@@ -9,7 +9,7 @@ import datetime
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
 # УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОЙ АКТУАЛЬНЫЙ ТОКЕН
-BOT_TOKEN = "8522157971:AAFDGk7ca05Ji4rOb83mRbbmlsvdpou3rwM"
+BOT_TOKEN = "522157971:AAFDGk7ca05Ji4rOb83mRbbmlsvdpou3rwM"
 ADMIN_CHAT_ID = "866572746"
 # ---------------------------------
 
@@ -24,7 +24,7 @@ app = Flask(__name__)
 def index():
     return "I am alive!"
 
-# --- СТРУКТУРА ДАННЫХ ДЛЯ СМЕН ---
+# --- СТРУКТУРА ДАННЫХ ДЛЯ ДВОЙНЫХ СМЕН ---
 base_shift_times = [
     "08:00-09:30", "09:30-11:00", "11:00-12:30", "12:30-14:00",
     "14:00-15:30", "15:30-17:00", "17:00-18:30", "18:30-20:00",
@@ -33,7 +33,7 @@ base_shift_times = [
 
 shifts = []
 slot_id_counter = 0
-for _ in range(2):
+for _ in range(2): # Создаем 2 набора смен для двух человек
     for time_slot in base_shift_times:
         shifts.append({
             "slot_id": slot_id_counter,
@@ -60,7 +60,6 @@ def start(update: telegram.Update, context: CallbackContext):
     update.message.reply_text(f"👋 Привет, {user_name}!\n\nЯ бот для бронирования смен. Чтобы посмотреть доступные смены, используй команду /shifts.\n\nАдминистратор может получить отчет по команде /grafik.")
 
 def show_shifts(update: telegram.Update, context: CallbackContext):
-    # ИЗМЕНЕНИЕ: Получаем дату в нужном формате
     today_date_str = datetime.datetime.now().strftime("%d.%m.%Y")
     keyboard = create_shifts_keyboard()
     update.message.reply_text(f"🗓️ **Доступные смены на {today_date_str}:**\n\nНажмите на свободную смену, чтобы занять ее.", reply_markup=keyboard, parse_mode='Markdown')
@@ -87,7 +86,6 @@ def take_shift_callback(update: telegram.Update, context: CallbackContext):
         except Exception as e:
             logger.error(f"Не удалось отправить сообщение админу: {e}")
 
-        # ИЗМЕНЕНИЕ: Обновляем клавиатуру с датой
         today_date_str = datetime.datetime.now().strftime("%d.%m.%Y")
         context.bot.edit_message_text(
             chat_id=query.message.chat_id,
@@ -104,13 +102,13 @@ def reset_shifts_job():
         slot['user_info'] = None
     logger.info("Все смены были сброшены на новый день.")
 
+# ФУНКЦИЯ ДЛЯ ОТЧЕТА-ГРАФИКА
 def send_grafik(update: telegram.Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
     if user_id != ADMIN_CHAT_ID:
         update.message.reply_text("Эта команда доступна только администратору.")
         return
 
-    # ИЗМЕНЕНИЕ: Получаем дату для отчета
     today_date_str = datetime.datetime.now().strftime("%d.%m.%Y")
     
     booked_shifts = [slot for slot in shifts if slot['user_info']]
@@ -135,7 +133,7 @@ def main_bot():
         dispatcher = updater.dispatcher
         dispatcher.add_handler(CommandHandler("start", start))
         dispatcher.add_handler(CommandHandler("shifts", show_shifts))
-        dispatcher.add_handler(CommandHandler("grafik", send_grafik))
+        dispatcher.add_handler(CommandHandler("grafik", send_grafik)) # Добавлена команда
         dispatcher.add_handler(CallbackQueryHandler(take_shift_callback))
         scheduler = BackgroundScheduler(timezone="Europe/Moscow")
         scheduler.add_job(reset_shifts_job, 'cron', hour=7, minute=55, second=0)
