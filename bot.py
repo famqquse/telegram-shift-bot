@@ -9,8 +9,12 @@ import datetime
 
 # --- НАСТРОЙКИ (ОЧЕНЬ ВАЖНО!) ---
 # УБЕДИТЕСЬ, ЧТО ВЫ ВСТАВИЛИ СЮДА СВОЙ АКТУАЛЬНЫЙ ТОКЕН
-BOT_TOKEN = "522157971:AAFDGk7ca05Ji4rOb83mRbbmlsvdpou3rwM"
-ADMIN_CHAT_ID = "866572746"
+import os
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
+
+# ... (дальше идет остальной код)
+
 # ---------------------------------
 
 logging.basicConfig(
@@ -149,3 +153,4 @@ if __name__ == "__main__":
     bot_thread.start()
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
